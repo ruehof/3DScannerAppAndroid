@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">3D Scanner</string>
+
+    <!-- Kamera-Screen -->
+    <string name="btn_start_scan">Scan starten</string>
+    <string name="btn_stop_scan">Scan abbrechen</string>
+    <string name="btn_capture_single">Foto</string>
+    <string name="btn_settings">Einstellungen</string>
+    <string name="label_num_photos">Anzahl Fotos</string>
+    <string name="label_total_degrees">Gesamtwinkel (°)</string>
+    <string name="label_step_degrees">Schritt: %1$.1f°</string>
+    <string name="label_connection_status">Verbindung</string>
+    <string name="status_disconnected">Getrennt</string>
+    <string name="status_connecting">Verbinde…</string>
+    <string name="status_connected">Verbunden</string>
+    <string name="status_error">Fehler</string>
+    <string name="scan_progress">Foto %1$d von %2$d</string>
+    <string name="scan_complete">Scan abgeschlossen – %1$d Fotos gespeichert</string>
+    <string name="scan_idle">Bereit</string>
+    <string name="btn_connect">Verbinden</string>
+    <string name="btn_disconnect">Trennen</string>
+
+    <!-- Einstellungen-Screen -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_esp_ip">ESP8266 IP-Adresse</string>
+    <string name="settings_esp_ip_hint">z.B. 192.168.1.100</string>
+    <string name="settings_motor_speed">Drehgeschwindigkeit (°/Sek.)</string>
+    <string name="settings_motor_speed_hint">1 – 79</string>
+    <string name="settings_pause_after_move">Pause nach Bewegung (ms)</string>
+    <string name="settings_pause_hint">z.B. 1000</string>
+    <string name="settings_save">Speichern</string>
+    <string name="settings_saved">Einstellungen gespeichert</string>
+    <string name="settings_section_connection">Verbindung</string>
+    <string name="settings_section_motor">Motor</string>
+
+    <!-- Fehlermeldungen -->
+    <string name="error_camera_permission">Kameraberechtigungen benötigt</string>
+    <string name="error_not_connected">Nicht mit Drehteller verbunden</string>
+    <string name="error_scan_failed">Scan fehlgeschlagen</string>
+    <string name="error_photo_failed">Foto konnte nicht gespeichert werden</string>
+    <string name="grant_permission">Berechtigung erteilen</string>
+
+    <!-- Foto-Speicherort -->
+    <string name="photos_saved_to">Fotos gespeichert unter DCIM/3DScanner</string>
+</resources>
