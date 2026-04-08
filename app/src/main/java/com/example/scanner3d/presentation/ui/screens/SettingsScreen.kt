@@ -25,12 +25,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -43,7 +45,8 @@ import com.example.scanner3d.presentation.viewmodel.SettingsViewModel
 
 /**
  * Einstellungen-Screen.
- * Erlaubt die Konfiguration von IP-Adresse, Motorgeschwindigkeit und Pause.
+ * Konfiguriert: IP-Adresse, Motorgeschwindigkeit, Pause, Scan-Parameter,
+ * Auslösegeräusch.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +57,6 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Erfolgsmeldung anzeigen
     LaunchedEffect(uiState.savedSuccessfully) {
         if (uiState.savedSuccessfully) {
             snackbarHostState.showSnackbar("Einstellungen gespeichert")
@@ -70,7 +72,7 @@ fun SettingsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurueck"
+                            contentDescription = "Zur\u00fcck"
                         )
                     }
                 }
@@ -109,9 +111,43 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // === Scan-Parameter ===
+            SettingsSectionCard(title = "Scan-Parameter") {
+                // Anzahl Fotos
+                val stepDegrees = if (uiState.settings.numPhotos > 0)
+                    uiState.settings.totalDegrees / uiState.settings.numPhotos else 0f
+                SettingsSliderRow(
+                    label = "Anzahl Fotos",
+                    value = uiState.settings.numPhotos.toFloat(),
+                    valueLabel = "${uiState.settings.numPhotos} Fotos  \u2022  ${String.format("%.1f", stepDegrees)}\u00b0/Schritt",
+                    valueRange = 4f..72f,
+                    steps = 67,
+                    onValueChange = { viewModel.updateNumPhotos(it.toInt()) }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Gesamtwinkel
+                SettingsSliderRow(
+                    label = "Gesamtwinkel",
+                    value = uiState.settings.totalDegrees,
+                    valueLabel = "${uiState.settings.totalDegrees.toInt()}\u00b0",
+                    valueRange = 90f..360f,
+                    steps = 269,
+                    onValueChange = viewModel::updateTotalDegrees
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "F\u00fcr einen vollst\u00e4ndigen Rundum-Scan: 360\u00b0",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // === Motor ===
             SettingsSectionCard(title = "Motor") {
-                // Geschwindigkeit
                 SettingsSliderRow(
                     label = "Drehgeschwindigkeit",
                     value = uiState.settings.motorSpeedDps,
@@ -122,14 +158,13 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Empfehlung: 30\u201350 \u00b0/Sek. fuer stabile Scans. Maximum: 79 \u00b0/Sek.",
+                    text = "Empfehlung: 30\u201350 \u00b0/Sek. f\u00fcr stabile Scans. Maximum: 79 \u00b0/Sek.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Pause
                 SettingsSliderRow(
                     label = "Pause nach Bewegung",
                     value = uiState.settings.pauseAfterMoveMs.toFloat(),
@@ -140,10 +175,39 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Wartezeit nach dem Stopp, damit das Objekt aufhoert zu schwingen.",
+                    text = "Wartezeit nach dem Stopp, damit das Objekt aufh\u00f6rt zu schwingen.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // === Kamera ===
+            SettingsSectionCard(title = "Kamera") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Ausl\u00f6seger\u00e4usch",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Klick-Ton bei jeder Aufnahme",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = uiState.settings.shutterSoundEnabled,
+                        onCheckedChange = viewModel::updateShutterSoundEnabled
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -163,7 +227,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Hinweis fuer Photogrammetrie-Nutzer
+            // Tipps für Photogrammetrie-Nutzer
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -171,17 +235,17 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Tipps fuer Photogrammetrie",
+                        text = "Tipps f\u00fcr Photogrammetrie",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "- Fotos werden unter DCIM/3DScanner gespeichert\n" +
-                               "- Empfohlen: 24\u201336 Fotos bei 360\u00b0\n" +
-                               "- Pause von 1000\u20132000 ms fuer schwere Objekte\n" +
-                               "- Gleichmaessige Beleuchtung verbessert das 3D-Modell\n" +
-                               "- Kompatibel mit Meshroom, RealityCapture und COLMAP",
+                        text = "\u2022 Fotos werden unter DCIM/3DScanner gespeichert\n" +
+                               "\u2022 Empfohlen: 24\u201336 Fotos bei 360\u00b0\n" +
+                               "\u2022 Pause von 1000\u20132000 ms f\u00fcr schwere Objekte\n" +
+                               "\u2022 Gleichm\u00e4\u00dfige Beleuchtung verbessert das 3D-Modell\n" +
+                               "\u2022 Kompatibel mit Meshroom, RealityCapture und COLMAP",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 20.sp
@@ -225,15 +289,12 @@ private fun SettingsSliderRow(
     steps: Int,
     onValueChange: (Float) -> Unit
 ) {
-    Text(
-        text = label,
-        fontSize = 13.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(text = label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             text = valueLabel,
             fontSize = 13.sp,

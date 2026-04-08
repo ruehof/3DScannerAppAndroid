@@ -10,5 +10,11 @@ data class ScanSettings(
     /** Drehgeschwindigkeit des Motors in Grad/Sekunde (1.0 – 79.0) */
     val motorSpeedDps: Float = 45f,
     /** Pause nach jeder Bewegung in Millisekunden, damit das Objekt sich beruhigen kann */
-    val pauseAfterMoveMs: Long = 1000L
+    val pauseAfterMoveMs: Long = 1000L,
+    /** Anzahl der Fotos pro Scan-Durchlauf */
+    val numPhotos: Int = 10,
+    /** Gesamtdrehwinkel des Drehtellers in Grad */
+    val totalDegrees: Float = 360f,
+    /** Auslösegeräusch bei jeder Aufnahme abspielen */
+    val shutterSoundEnabled: Boolean = true
 )

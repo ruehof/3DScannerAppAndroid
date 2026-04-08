@@ -56,6 +56,20 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(settings = it.settings.copy(pauseAfterMoveMs = clipped)) }
     }
 
+    fun updateNumPhotos(n: Int) {
+        val clipped = n.coerceIn(4, 72)
+        _uiState.update { it.copy(settings = it.settings.copy(numPhotos = clipped)) }
+    }
+
+    fun updateTotalDegrees(d: Float) {
+        val clipped = d.coerceIn(90f, 360f)
+        _uiState.update { it.copy(settings = it.settings.copy(totalDegrees = clipped)) }
+    }
+
+    fun updateShutterSoundEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(settings = it.settings.copy(shutterSoundEnabled = enabled)) }
+    }
+
     fun saveSettings() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, savedSuccessfully = false) }

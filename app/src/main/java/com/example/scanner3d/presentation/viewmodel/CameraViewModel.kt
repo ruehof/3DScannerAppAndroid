@@ -33,7 +33,8 @@ data class CameraUiState(
     val totalDegrees: Float = 360f,
     val capturedPhotoCount: Int = 0,
     val errorMessage: String? = null,
-    val espIpAddress: String = "192.168.1.100"
+    val espIpAddress: String = "192.168.1.100",
+    val shutterSoundEnabled: Boolean = true
 ) {
     /** Berechnet den Drehwinkel pro Schritt */
     val stepDegrees: Float get() = if (numPhotos > 0) totalDegrees / numPhotos else 0f
@@ -73,10 +74,15 @@ class CameraViewModel @Inject constructor(
                 }
             }
         }
-        // Gespeicherte IP aus Einstellungen laden
+        // Alle relevanten Einstellungen aus dem DataStore laden und bei Änderungen aktualisieren
         viewModelScope.launch {
             scanSettingsRepository.settings.collect { settings ->
-                _uiState.update { it.copy(espIpAddress = settings.espIpAddress) }
+                _uiState.update { it.copy(
+                    espIpAddress = settings.espIpAddress,
+                    numPhotos = settings.numPhotos,
+                    totalDegrees = settings.totalDegrees,
+                    shutterSoundEnabled = settings.shutterSoundEnabled
+                )}
             }
         }
     }
@@ -91,18 +97,6 @@ class CameraViewModel @Inject constructor(
         turntableRepository.disconnect()
     }
 
-    fun setNumPhotos(n: Int) {
-        if (n in 1..360 && !_uiState.value.isScanning) {
-            _uiState.update { it.copy(numPhotos = n) }
-        }
-    }
-
-    fun setTotalDegrees(d: Float) {
-        if (d in 1f..360f && !_uiState.value.isScanning) {
-            _uiState.update { it.copy(totalDegrees = d) }
-        }
-    }
-
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -114,11 +108,42 @@ class CameraViewModel @Inject constructor(
     }
 
     /**
+     * Drehteller manuell nach links (CCW) drehen.
+     * @param degrees Winkel in Grad (3.6° bei Kurzklick, 36° bei Langklick)
+     */
+    fun rotateLeft(degrees: Float) {
+        if (_uiState.value.isScanning) return
+        if (_uiState.value.connectionState !is ConnectionState.Connected) {
+            _uiState.update { it.copy(errorMessage = "Nicht verbunden") }
+            return
+        }
+        viewModelScope.launch {
+            val settings = scanSettingsRepository.settings.first()
+            turntableRepository.moveMotor(-degrees, settings.motorSpeedDps)
+        }
+    }
+
+    /**
+     * Drehteller manuell nach rechts (CW) drehen.
+     * @param degrees Winkel in Grad (3.6° bei Kurzklick, 36° bei Langklick)
+     */
+    fun rotateRight(degrees: Float) {
+        if (_uiState.value.isScanning) return
+        if (_uiState.value.connectionState !is ConnectionState.Connected) {
+            _uiState.update { it.copy(errorMessage = "Nicht verbunden") }
+            return
+        }
+        viewModelScope.launch {
+            val settings = scanSettingsRepository.settings.first()
+            turntableRepository.moveMotor(degrees, settings.motorSpeedDps)
+        }
+    }
+
+    /**
      * Scan-Ablauf starten.
      *
      * @param takePicture Lambda-Funktion aus dem Kamera-Screen, die ein Foto aufnimmt
-     *                    und den gespeicherten URI zurückgibt. Wird auf dem Main-Thread
-     *                    aufgerufen (CameraX-Executor).
+     *                    und den gespeicherten URI zurückgibt.
      */
     fun startScan(takePicture: suspend (index: Int) -> Result<Uri>) {
         if (_uiState.value.isScanning) return
@@ -139,7 +164,6 @@ class CameraViewModel @Inject constructor(
             )}
 
             for (i in 0 until numPhotos) {
-                // Status aktualisieren
                 _uiState.update { it.copy(scanState = ScanState.Scanning(i + 1, numPhotos)) }
 
                 // Foto aufnehmen
