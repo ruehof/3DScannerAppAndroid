@@ -164,9 +164,17 @@ class CameraViewModel @Inject constructor(
             )}
 
             for (i in 0 until numPhotos) {
+                // Stabilisierungspause vor jedem Foto – außer vor dem allerersten.
+                // Der Motor dreht am Ende jeder Iteration; die Pause kommt danach
+                // (= am Anfang der nächsten Iteration), damit das Objekt vollständig
+                // zur Ruhe kommt, bevor Ton + Aufnahme ausgelöst werden.
+                if (i > 0) {
+                    delay(settings.pauseAfterMoveMs)
+                }
+
                 _uiState.update { it.copy(scanState = ScanState.Scanning(i + 1, numPhotos)) }
 
-                // Foto aufnehmen
+                // Foto aufnehmen (Auslöseton wird innerhalb von capturePhoto() gespielt)
                 val photoResult = takePicture(i + 1)
                 if (photoResult.isFailure) {
                     _uiState.update { it.copy(
@@ -189,9 +197,7 @@ class CameraViewModel @Inject constructor(
                         )}
                         return@launch
                     }
-
-                    // Pause nach Bewegung – Objekt beruhigen lassen
-                    delay(settings.pauseAfterMoveMs)
+                    // Pause wird am Anfang der nächsten Iteration abgewartet (s. o.)
                 }
             }
 
