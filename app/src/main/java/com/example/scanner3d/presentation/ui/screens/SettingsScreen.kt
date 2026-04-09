@@ -120,8 +120,8 @@ fun SettingsScreen(
                     label = "Anzahl Fotos",
                     value = uiState.settings.numPhotos.toFloat(),
                     valueLabel = "${uiState.settings.numPhotos} Fotos  \u2022  ${String.format("%.1f", stepDegrees)}\u00b0/Schritt",
-                    valueRange = 4f..72f,
-                    steps = 67,
+                    valueRange = 6f..36f,
+                    steps = 29,
                     onValueChange = { viewModel.updateNumPhotos(it.toInt()) }
                 )
 

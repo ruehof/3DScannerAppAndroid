@@ -57,7 +57,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun updateNumPhotos(n: Int) {
-        val clipped = n.coerceIn(4, 72)
+        val clipped = n.coerceIn(6, 36)
         _uiState.update { it.copy(settings = it.settings.copy(numPhotos = clipped)) }
     }
 
