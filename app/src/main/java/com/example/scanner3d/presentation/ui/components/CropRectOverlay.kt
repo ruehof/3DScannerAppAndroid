@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,8 +42,10 @@ private enum class DragTarget {
  * - Fläche innerhalb des Rahmens ziehen → Position ändern
  * - Außerhalb tippen/ziehen → keine Aktion
  *
- * Der Ausschnitt hat eine Mindestgröße von 5 % der Vorschaufläche
- * und kann nicht über den Rand hinausgeschoben werden.
+ * Wichtig: Das [pointerInput]-Modifier verwendet [Unit] als Schlüssel und liest den
+ * aktuellen [state] via [rememberUpdatedState]. Dadurch wird die laufende Drag-Geste
+ * nicht bei jeder State-Änderung neu gestartet – das war der Grund, warum die
+ * Größenänderung per Ziehen an den Ecken nicht funktioniert hat.
  *
  * @param state        Aktueller normalisierter Ausschnitt (0..1 je Koordinate)
  * @param onStateChange Callback, der bei jeder Änderung mit dem neuen Zustand gerufen wird
@@ -54,20 +57,30 @@ fun CropRectOverlay(
     onStateChange: (CropRectState) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Welcher Teil wird gerade gezogen
+    // Letzten State und Callback im Gesture-Handler verfügbar machen, ohne
+    // den pointerInput-Block neu zu starten (Unit-Schlüssel bleibt konstant).
+    val currentState by rememberUpdatedState(state)
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
+
+    // Welcher Teil wird gerade gezogen – nur während des Drags belegt
     var dragTarget by remember { mutableStateOf(DragTarget.NONE) }
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(state) {
-                val handleRadiusPx = 36.dp.toPx()   // Trefferbereich für Eck-Handles
+            // Unit als Schlüssel → pointerInput wird NIEMALS neu gestartet.
+            // Das ist entscheidend: bei Schlüssel = state würde jede Crop-Änderung
+            // den Block neu starten und die laufende Geste abbrechen.
+            .pointerInput(Unit) {
+                val handleRadiusPx = 36.dp.toPx()   // Trefferbereich der Eck-Handles
                 detectDragGestures(
                     onDragStart = { offset ->
-                        val l = state.left   * size.width
-                        val t = state.top    * size.height
-                        val r = state.right  * size.width
-                        val b = state.bottom * size.height
+                        // Aktuelle Crop-Koordinaten in Pixel
+                        val s = currentState
+                        val l = s.left   * size.width
+                        val t = s.top    * size.height
+                        val r = s.right  * size.width
+                        val b = s.bottom * size.height
                         dragTarget = when {
                             dist(offset, Offset(l, t)) < handleRadiusPx -> DragTarget.TOP_LEFT
                             dist(offset, Offset(r, t)) < handleRadiusPx -> DragTarget.TOP_RIGHT
@@ -81,40 +94,43 @@ fun CropRectOverlay(
                     onDragCancel = { dragTarget = DragTarget.NONE },
                     onDrag = { _, drag ->
                         if (dragTarget == DragTarget.NONE) return@detectDragGestures
+                        val s = currentState
                         val dx = drag.x / size.width
                         val dy = drag.y / size.height
-                        val MIN = 0.05f          // Mindestgröße 5 % der Vorschaubreite/-höhe
-                        onStateChange(
+                        val MIN = 0.05f          // Mindestgröße 5 % der Vorschau
+                        currentOnStateChange(
                             when (dragTarget) {
-                                DragTarget.MOVE -> state.copy(
-                                    left   = (state.left   + dx).coerceIn(0f, state.right  - MIN),
-                                    top    = (state.top    + dy).coerceIn(0f, state.bottom - MIN),
-                                    right  = (state.right  + dx).coerceIn(state.left + MIN, 1f),
-                                    bottom = (state.bottom + dy).coerceIn(state.top  + MIN, 1f)
+                                DragTarget.MOVE -> s.copy(
+                                    left   = (s.left   + dx).coerceIn(0f, s.right  - MIN),
+                                    top    = (s.top    + dy).coerceIn(0f, s.bottom - MIN),
+                                    right  = (s.right  + dx).coerceIn(s.left + MIN, 1f),
+                                    bottom = (s.bottom + dy).coerceIn(s.top  + MIN, 1f)
                                 )
-                                DragTarget.TOP_LEFT -> state.copy(
-                                    left = (state.left + dx).coerceIn(0f, state.right  - MIN),
-                                    top  = (state.top  + dy).coerceIn(0f, state.bottom - MIN)
+                                DragTarget.TOP_LEFT -> s.copy(
+                                    left = (s.left + dx).coerceIn(0f, s.right  - MIN),
+                                    top  = (s.top  + dy).coerceIn(0f, s.bottom - MIN)
                                 )
-                                DragTarget.TOP_RIGHT -> state.copy(
-                                    right = (state.right + dx).coerceIn(state.left + MIN, 1f),
-                                    top   = (state.top   + dy).coerceIn(0f, state.bottom - MIN)
+                                DragTarget.TOP_RIGHT -> s.copy(
+                                    right = (s.right + dx).coerceIn(s.left + MIN, 1f),
+                                    top   = (s.top   + dy).coerceIn(0f, s.bottom - MIN)
                                 )
-                                DragTarget.BOTTOM_LEFT -> state.copy(
-                                    left   = (state.left   + dx).coerceIn(0f, state.right  - MIN),
-                                    bottom = (state.bottom + dy).coerceIn(state.top  + MIN, 1f)
+                                DragTarget.BOTTOM_LEFT -> s.copy(
+                                    left   = (s.left   + dx).coerceIn(0f, s.right  - MIN),
+                                    bottom = (s.bottom + dy).coerceIn(s.top  + MIN, 1f)
                                 )
-                                DragTarget.BOTTOM_RIGHT -> state.copy(
-                                    right  = (state.right  + dx).coerceIn(state.left + MIN, 1f),
-                                    bottom = (state.bottom + dy).coerceIn(state.top  + MIN, 1f)
+                                DragTarget.BOTTOM_RIGHT -> s.copy(
+                                    right  = (s.right  + dx).coerceIn(s.left + MIN, 1f),
+                                    bottom = (s.bottom + dy).coerceIn(s.top  + MIN, 1f)
                                 )
-                                DragTarget.NONE -> state
+                                DragTarget.NONE -> s
                             }
                         )
                     }
                 )
             }
     ) {
+        // ── Zeichnen mit dem aktuellen state-Parameter (wird bei Recomposition aktualisiert) ──
+
         val l = state.left   * size.width
         val t = state.top    * size.height
         val r = state.right  * size.width
@@ -122,16 +138,12 @@ fun CropRectOverlay(
 
         // ── Abdunkelung außerhalb des Ausschnitts ────────────────────────────
         val shadow = Color.Black.copy(alpha = 0.50f)
-        // oben
         drawRect(shadow, topLeft = Offset(0f, 0f),
             size = androidx.compose.ui.geometry.Size(size.width, t))
-        // unten
         drawRect(shadow, topLeft = Offset(0f, b),
             size = androidx.compose.ui.geometry.Size(size.width, size.height - b))
-        // links (zwischen Rahmen-oben und -unten)
         drawRect(shadow, topLeft = Offset(0f, t),
             size = androidx.compose.ui.geometry.Size(l, b - t))
-        // rechts
         drawRect(shadow, topLeft = Offset(r, t),
             size = androidx.compose.ui.geometry.Size(size.width - r, b - t))
 
@@ -160,13 +172,12 @@ fun CropRectOverlay(
         val handleR = 10.dp.toPx()
         val innerR  = handleR - 2.5.dp.toPx()
         listOf(Offset(l, t), Offset(r, t), Offset(l, b), Offset(r, b)).forEach { c ->
-            drawCircle(Color.White,          radius = handleR, center = c)
-            drawCircle(Color(0xFF222222), radius = innerR, center = c)
+            drawCircle(Color.White,        radius = handleR, center = c)
+            drawCircle(Color(0xFF222222),  radius = innerR,  center = c)
         }
     }
 }
 
-// Hilfsfunktion: euklidischer Abstand zwischen zwei Punkten
 private fun dist(a: Offset, b: Offset): Float {
     val dx = a.x - b.x
     val dy = a.y - b.y

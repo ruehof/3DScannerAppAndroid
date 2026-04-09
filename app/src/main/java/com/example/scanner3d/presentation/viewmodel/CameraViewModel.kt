@@ -164,14 +164,6 @@ class CameraViewModel @Inject constructor(
             )}
 
             for (i in 0 until numPhotos) {
-                // Stabilisierungspause vor jedem Foto – außer vor dem allerersten.
-                // Der Motor dreht am Ende jeder Iteration; die Pause kommt danach
-                // (= am Anfang der nächsten Iteration), damit das Objekt vollständig
-                // zur Ruhe kommt, bevor Ton + Aufnahme ausgelöst werden.
-                if (i > 0) {
-                    delay(settings.pauseAfterMoveMs)
-                }
-
                 _uiState.update { it.copy(scanState = ScanState.Scanning(i + 1, numPhotos)) }
 
                 // Foto aufnehmen (Auslöseton wird innerhalb von capturePhoto() gespielt)
@@ -187,6 +179,9 @@ class CameraViewModel @Inject constructor(
 
                 // Motor drehen (außer nach dem letzten Foto)
                 if (i < numPhotos - 1) {
+                    // Zeitstempel vor dem Befehl – für die Mindest-Wartezeit
+                    val moveStartMs = System.currentTimeMillis()
+
                     val moveResult = turntableRepository.moveMotor(
                         degrees = stepDegrees,
                         speedDps = settings.motorSpeedDps
@@ -197,7 +192,22 @@ class CameraViewModel @Inject constructor(
                         )}
                         return@launch
                     }
-                    // Pause wird am Anfang der nächsten Iteration abgewartet (s. o.)
+
+                    // Robuste Wartezeit:
+                    // Manche ESP8266-Firmware-Varianten senden "ok" sobald die Impuls-
+                    // sequenz gestartet wurde, nicht erst wenn der Motor physisch stillsteht.
+                    // Deshalb warten wir mindestens die berechnete Fahrzeit
+                    // (stepDegrees / speedDps) – egal wie schnell die ESP-Antwort kam –
+                    // plus die konfigurierte Beruhigungspause.
+                    val calculatedTravelMs = (stepDegrees / settings.motorSpeedDps * 1000f).toLong()
+                    val elapsed            = System.currentTimeMillis() - moveStartMs
+                    val remainingTravel    = (calculatedTravelMs - elapsed).coerceAtLeast(0L)
+
+                    // Erst restliche Fahrzeit abwarten (falls ESP zu früh geantwortet hat)
+                    if (remainingTravel > 0) delay(remainingTravel)
+
+                    // Dann Beruhigungspause: Objekt schwingt aus, bevor das nächste Foto gemacht wird
+                    delay(settings.pauseAfterMoveMs)
                 }
             }
 

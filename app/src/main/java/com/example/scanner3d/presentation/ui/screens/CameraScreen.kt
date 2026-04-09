@@ -491,33 +491,45 @@ private fun LensSelector(
 @OptIn(ExperimentalCamera2Interop::class)
 private fun enumerateBackLenses(provider: ProcessCameraProvider): List<LensOption> {
     return try {
-        provider.availableCameraInfos
+        // Alle Hinterkameras einbeziehen – auch solche ohne Brennweiten-Metadaten.
+        // mapNotNull würde Kameras ohne LENS_INFO_AVAILABLE_FOCAL_LENGTHS herausfiltern
+        // und so z. B. auf einem Samsung S10+ nur 2 statt 3 Objektive anzeigen.
+        val backCameras = provider.availableCameraInfos
             .filter { it.lensFacing == CameraSelector.LENS_FACING_BACK }
-            .mapNotNull { cameraInfo ->
+
+        backCameras
+            .mapIndexed { index, cameraInfo ->
                 try {
-                    val cam2 = Camera2CameraInfo.from(cameraInfo)
+                    val cam2      = Camera2CameraInfo.from(cameraInfo)
+                    val cameraId  = cam2.cameraId
                     val focalLengths = cam2.getCameraCharacteristic(
                         CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
                     )
-                    val minFocal = focalLengths?.minOrNull() ?: return@mapNotNull null
-                    val cameraId = cam2.cameraId
-                    Triple(cameraInfo, minFocal, cameraId)
+                    // Brennweite vorhanden → "Xmm"-Label, sonst Fallback-Nummer
+                    val minFocal = focalLengths?.minOrNull()
+                    val label = when {
+                        minFocal != null && minFocal >= 1f -> "${minFocal.toInt()}mm"
+                        minFocal != null                   -> "<1mm"
+                        else                               -> "Obj.${index + 1}"
+                    }
+                    Triple(cameraId, label, minFocal ?: Float.MAX_VALUE)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Brennweite für Kamera nicht lesbar: ${e.message}")
-                    null
+                    Log.w(TAG, "Kamera-Metadaten nicht lesbar [index $index]: ${e.message}")
+                    Triple("cam_$index", "Obj.${index + 1}", Float.MAX_VALUE)
                 }
             }
-            .sortedBy { (_, focal, _) -> focal }
-            .map { (cameraInfo, focal, cameraId) ->
-                val label = if (focal < 1f) "<1mm"
-                            else "${focal.toInt()}mm"
+            // Nach Brennweite aufsteigend sortieren (Weitwinkel zuerst, Tele zuletzt)
+            .sortedBy { (_, _, focal) -> focal }
+            .map { (cameraId, label, _) ->
                 LensOption(
                     cameraId = cameraId,
-                    label = label,
+                    label    = label,
                     cameraSelector = CameraSelector.Builder()
                         .addCameraFilter { infos ->
                             infos.filter { info ->
-                                Camera2CameraInfo.from(info).cameraId == cameraId
+                                try {
+                                    Camera2CameraInfo.from(info).cameraId == cameraId
+                                } catch (e: Exception) { false }
                             }
                         }
                         .build()
